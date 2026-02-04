@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chór Mixer Pro - Final Mobile & PC</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        :root {
+            --bg: #0b0e11; --panel: #1a1f24; --text: #e0e6ed;
+            --green: #2ecc71; --red: #e74c3c; --blue: #3498db; --accent: #f1c40f;
+        }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            font-family: 'Segoe UI', Roboto, sans-serif; 
+            background: var(--bg); color: var(--text); margin: 0; padding: 15px;
+            display: flex; justify-content: center;
+        }
+
+        .container { width: 100%; max-width: 600px; } /* Ograniczenie szerokości dla czytelności */
+
+        /* Sekcja plików */
+        .upload-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
+        }
+        .file-card {
+            background: var(--panel); border: 2px dashed #3a444d; border-radius: 12px;
+            position: relative; padding: 12px; text-align: center; font-size: 0.8rem;
+        }
+        .file-card.loaded { border-color: var(--green); background: rgba(46, 204, 113, 0.1); }
+        .file-card input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+        /* Panel główny */
+        .master-panel {
+            background: #242b32; padding: 20px; border-radius: 20px; margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+        }
+        .main-btns { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 15px; }
+        
+        button { border: none; border-radius: 10px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+        
+        .btn-play { background: var(--green); padding: 16px; font-size: 1rem; }
+        .btn-play:disabled { background: #333; color: #666; }
+        .btn-stop { background: var(--red); }
+        
+        .reset-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
+        .btn-reset { background: #3d4956; padding: 10px 5px; font-size: 0.7rem; text-transform: uppercase; }
+
+        /* Suwaki główne */
+        .slider-box { margin-bottom: 15px; }
+        .slider-label { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 5px; color: #aaa; }
+        .val { color: var(--accent); font-weight: bold; }
+
+        input[type="range"] {
+            -webkit-appearance: none; width: 100%; height: 8px; background: #3a444d;
+            border-radius: 10px; outline: none; margin: 10px 0;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 26px; height: 26px; background: #fff; border-radius: 50%;
+        }
+
+        /* Mikser - Pionowa lista */
+        .mixer-list { display: flex; flex-direction: column; gap: 12px; }
+        .voice-card {
+            background: var(--panel); padding: 15px; border-radius: 15px;
+            border-left: 4px solid #3a444d;
+        }
+        .v-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .v-controls { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
+        
+        .btn-v { padding: 12px; font-size: 0.75rem; background: #2c343a; min-width: 70px; }
+        .active-solo { background: var(--blue) !important; }
+        .active-mute { background: var(--red) !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="status" style="text-align:center; font-size:0.75rem; margin-bottom:12px; color:var(--accent)">
+        Wgraj 4 głosy, aby odblokować mikser
+    </div>
+
+    <div class="upload-grid">
+        <div class="file-card" id="card-Sopran">SOPRAN<input type="file" accept="audio/*" id="in-Sopran"></div>
+        <div class="file-card" id="card-Alt">ALT<input type="file" accept="audio/*" id="in-Alt"></div>
+        <div class="file-card" id="card-Tenor">TENOR<input type="file" accept="audio/*" id="in-Tenor"></div>
+        <div class="file-card" id="card-Bas">BAS<input type="file" accept="audio/*" id="in-Bas"></div>
+    </div>
+
+    <div class="master-panel">
+        <div class="main-btns">
+            <button id="playBtn" class="btn-play" disabled onclick="togglePlay()">WYBIERZ PLIKI</button>
+            <button class="btn-stop" onclick="stopAudio()">STOP</button>
+        </div>
+
+        <div class="reset-row">
+            <button class="btn-reset" onclick="resetTempo()">Tempo 1x</button>
+            <button class="btn-reset" onclick="resetPitch()">Strój 0</button>
+            <button class="btn-reset" onclick="resetMixer()">Reset Mix</button>
+        </div>
+
+        <div class="slider-box">
+            <div class="slider-label">Postęp: <span id="timeNow">0:00</span> / <span id="timeTotal">0:00</span></div>
+            <input type="range" id="seekbar" value="0" step="0.1">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div><label class="slider-label">TEMPO: <b id="sVal" class="val">1.0</b>x</label><input type="range" id="sRange" min="0.5" max="1.5" step="0.05" value="1"></div>
+            <div><label class="slider-label">STRÓJ: <b id="pVal" class="val">0</b>c</label><input type="range" id="pRange" min="-200" max="200" step="10" value="0"></div>
+        </div>
+    </div>
+
+    <div class="mixer-list" id="mixer-ui"></div>
+</div>
+
+<script>
+    const voices = ["Sopran", "Alt", "Tenor", "Bas"];
+    const players = {};
+    const files = {};
+    const defaultVol = -5;
+    
+    voices.forEach(v => {
+        document.getElementById(`in-${v}`).addEventListener('change', (e) => {
+            if(e.target.files[0]) {
+                files[v] = URL.createObjectURL(e.target.files[0]);
+                document.getElementById(`card-${v}`).classList.add('loaded');
+                if(Object.keys(files).length === 4) {
+                    const b = document.getElementById('playBtn'); b.disabled = false; b.innerText = "▶ ROZPOCZNIJ";
+                }
+            }
+        });
+
+        document.getElementById('mixer-ui').innerHTML += `
+            <div class="voice-card">
+                <div class="v-header"><b>${v.toUpperCase()}</b> <span id="db-${v}" style="opacity:0.5; font-size:0.7rem;">${defaultVol} dB</span></div>
+                <div class="v-controls">
+                    <input type="range" id="vol-${v}" min="-40" max="0" value="${defaultVol}" oninput="setVol('${v}', this.value)">
+                    <button class="btn-v" id="solo-${v}" onclick="solo('${v}')">SOLO</button>
+                    <button class="btn-v" id="mute-${v}" onclick="mute('${v}')">MUTE</button>
+                </div>
+            </div>`;
+    });
+
+    async function togglePlay() {
+        if (Tone.context.state !== 'running') await Tone.start();
+        if (Object.keys(players).length === 0) {
+            document.getElementById('playBtn').innerText = "Wczytywanie...";
+            for (const v of voices) { 
+                players[v] = new Tone.GrainPlayer(files[v]).toDestination(); 
+                players[v].volume.value = defaultVol;
+                players[v].playbackRate = parseFloat(document.getElementById('sRange').value);
+                players[v].detune = parseInt(document.getElementById('pRange').value);
+            }
+            await Tone.loaded();
+            document.getElementById('seekbar').max = players["Sopran"].buffer.duration;
+            document.getElementById('timeTotal').innerText = formatTime(players["Sopran"].buffer.duration);
+        }
+
+        if (Tone.Transport.state === "started") {
+            Tone.Transport.pause(); voices.forEach(v => players[v].stop());
+            document.getElementById('playBtn').innerText = "WZNÓW";
+        } else {
+            Tone.Transport.start(); voices.forEach(v => players[v].start(0, Tone.Transport.seconds));
+            document.getElementById('playBtn').innerText = "PAUZA";
+        }
+    }
+
+    // RESET FUNKCJE
+    function resetTempo() { document.getElementById('sRange').value = 1.0; updateTempo(1.0); }
+    function resetPitch() { document.getElementById('pRange').value = 0; updatePitch(0); }
+    function resetMixer() {
+        voices.forEach(v => {
+            if(players[v]) { players[v].volume.value = defaultVol; players[v].mute = false; }
+            document.getElementById(`vol-${v}`).value = defaultVol;
+            document.getElementById(`db-${v}`).innerText = `${defaultVol} dB`;
+            document.getElementById(`solo-${v}`).classList.remove('active-solo');
+            document.getElementById(`mute-${v}`).classList.remove('active-mute');
+        });
+    }
+
+    function updateTempo(val) { voices.forEach(v => { if(players[v]) players[v].playbackRate = val; }); document.getElementById('sVal').innerText = parseFloat(val).toFixed(2); }
+    function updatePitch(val) { voices.forEach(v => { if(players[v]) players[v].detune = val; }); document.getElementById('pVal').innerText = val; }
+
+    document.getElementById('sRange').oninput = (e) => updateTempo(e.target.value);
+    document.getElementById('pRange').oninput = (e) => updatePitch(e.target.value);
+
+    function setVol(v, val) { if(players[v]) players[v].volume.value = val; document.getElementById(`db-${v}`).innerText = `${val} dB`; }
+    function mute(v) { if(!players[v]) return; players[v].mute = !players[v].mute; document.getElementById(`mute-${v}`).classList.toggle('active-mute', players[v].mute); }
+    function solo(vT) {
+        voices.forEach(v => {
+            if(players[v]) {
+                const isS = (v === vT); const vol = isS ? 0 : -40;
+                players[v].volume.value = vol; document.getElementById(`vol-${v}`).value = vol;
+                document.getElementById(`db-${v}`).innerText = `${vol} dB`;
+                document.getElementById(`solo-${v}`).classList.toggle('active-solo', isS);
+            }
+        });
+    }
+
+    function stopAudio() {
+        Tone.Transport.stop(); Tone.Transport.seconds = 0;
+        voices.forEach(v => { if(players[v]) players[v].stop(); });
+        document.getElementById('playBtn').innerText = "ROZPOCZNIJ";
+        document.getElementById('seekbar').value = 0;
+    }
+
+    function formatTime(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}`; }
+
+    document.getElementById('seekbar').oninput = (e) => {
+        const t = parseFloat(e.target.value); Tone.Transport.seconds = t;
+        if (Tone.Transport.state === "started") voices.forEach(v => { players[v].stop(); players[v].start(0, t); });
+    };
+
+    Tone.Transport.scheduleRepeat(() => {
+        document.getElementById('seekbar').value = Tone.Transport.seconds;
+        document.getElementById('timeNow').innerText = formatTime(Tone.Transport.seconds);
+    }, "0.2s");
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chór Mixer Pro - Final Edition</title>
+    <title>Chór Mixer Pro - Dynamic Tracks</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.all.min.js"></script>
     <style>
@@ -15,6 +15,7 @@
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 600px; }
         
+        /* Grid plików */
         .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .file-card {
             background: var(--panel); border: 2px dashed #3a444d; border-radius: 12px;
@@ -24,8 +25,15 @@
         .file-card.loaded { border-color: var(--green); background: rgba(46, 204, 113, 0.1); }
         .file-card input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
         
-        .reset-btn-track { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; background: var(--red); color: white; border-radius: 50%; border: none; font-size: 10px; cursor: pointer; display: none; z-index: 10; }
-        .file-card.loaded .reset-btn-track { display: block; }
+        .reset-btn-track { position: absolute; top: -5px; right: -5px; width: 22px; height: 22px; background: var(--red); color: white; border-radius: 50%; border: 2px solid var(--bg); font-size: 12px; cursor: pointer; z-index: 10; font-weight: bold; }
+
+        /* Przycisk Plus */
+        .btn-add-track {
+            width: 100%; padding: 12px; margin-bottom: 20px; background: transparent; 
+            border: 2px dashed var(--blue); color: var(--blue); border-radius: 12px;
+            font-weight: bold; cursor: pointer; transition: 0.2s;
+        }
+        .btn-add-track:hover { background: rgba(52, 152, 219, 0.1); }
 
         .master-panel {
             background: #242b32; padding: 20px; border-radius: 20px; margin-bottom: 20px;
@@ -43,23 +51,15 @@
         .slider-label { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 5px; color: #aaa; align-items: center; }
         .val { color: var(--accent); font-weight: bold; margin: 0 5px; }
         
-        .btn-reset-full { 
-            background: #4a1c1c; color: #ff8a8a; padding: 4px 10px; 
-            font-size: 0.6rem; border-radius: 6px; border: 1px solid #632626;
-            text-transform: uppercase;
-        }
-        .btn-reset-main {
-            width: 100%; background: #2c343a; color: var(--accent); padding: 8px; 
-            font-size: 0.7rem; margin-bottom: 15px; border: 1px solid #3a444d; border-radius: 10px;
-        }
-
-        #seekbar { cursor: pointer; height: 10px; background: #111; }
-        #seekbar::-webkit-slider-thumb { background: var(--accent); border: 2px solid #fff; width: 18px; height: 18px; }
+        .btn-reset-full { background: #4a1c1c; color: #ff8a8a; padding: 4px 10px; font-size: 0.6rem; border-radius: 6px; border: 1px solid #632626; text-transform: uppercase; }
+        .btn-reset-main { width: 100%; background: #2c343a; color: var(--accent); padding: 8px; font-size: 0.7rem; margin-bottom: 15px; border: 1px solid #3a444d; border-radius: 10px; }
 
         input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; background: #3a444d; border-radius: 10px; outline: none; margin: 8px 0; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: #fff; border-radius: 50%; border: 2px solid var(--blue); }
 
-        .voice-card { background: var(--panel); padding: 12px; border-radius: 12px; border-left: 4px solid var(--accent); display: none; margin-bottom: 8px; }
+        .voice-card { background: var(--panel); padding: 12px; border-radius: 12px; border-left: 4px solid var(--accent); margin-bottom: 8px; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
         .v-controls { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
         .btn-v { padding: 8px; font-size: 0.7rem; background: #2c343a; min-width: 55px; }
         .active-solo { background: var(--blue) !important; }
@@ -70,6 +70,7 @@
 
 <div class="container">
     <div class="upload-grid" id="uploadGrid"></div>
+    <button class="btn-add-track" onclick="addNewTrackPrompt()">➕ DODAJ NOWĄ ŚCIEŻKĘ</button>
 
     <div class="master-panel">
         <button class="btn-reset-main" onclick="resetAll()">RESETUJ WSZYSTKO (DOMYŚLNE)</button>
@@ -109,7 +110,7 @@
 </div>
 
 <script>
-    const trackList = ["Sopran", "Alt", "Tenor", "Bas"];
+    let trackList = []; 
     const players = {}, buffers = {};
     let totalDuration = 0;
     let isSeeking = false;
@@ -119,24 +120,76 @@
     
     Tone.Destination.volume.value = pctToDb(75);
 
-    trackList.forEach(v => {
+    // Inicjalizacja domyślnych głosów
+    ["Sopran", "Alt", "Tenor", "Bas"].forEach(name => createTrackUI(name));
+
+    function addNewTrackPrompt() {
+        const name = prompt("Podaj nazwę nowej ścieżki:", "Głos " + (trackList.length + 1));
+        if (name && !trackList.includes(name)) {
+            createTrackUI(name);
+        } else if (trackList.includes(name)) {
+            alert("Ścieżka o tej nazwie już istnieje!");
+        }
+    }
+
+    function createTrackUI(name) {
+        trackList.push(name);
+        
+        // Upload Card
         const grid = document.getElementById('uploadGrid');
         const card = document.createElement('div');
-        card.className = 'file-card'; card.id = `card-${v}`;
-        card.innerHTML = `<button class="reset-btn-track" onclick="resetTrack('${v}')">✕</button><span>${v}</span><input type="file" accept="audio/*" onchange="handleFile(this, '${v}')">`;
+        card.className = 'file-card'; card.id = `card-${name}`;
+        card.innerHTML = `
+            <button class="reset-btn-track" onclick="removeTrack('${name}')">✕</button>
+            <span>${name}</span>
+            <input type="file" accept="audio/*" onchange="handleFile(this, '${name}')">`;
         grid.appendChild(card);
 
+        // Mixer Card
+        const mixer = document.getElementById('mixer-ui');
         const mix = document.createElement('div');
-        mix.className = 'voice-card'; mix.id = `mixer-card-${v}`;
+        mix.className = 'voice-card'; mix.id = `mixer-card-${name}`;
+        mix.style.display = "none";
         mix.innerHTML = `
-            <div class="slider-label"><span><b>${v}</b>: <span class="val" id="db-${v}">75%</span></span><button class="btn-reset-full" onclick="resetTrackVol('${v}')">RESET</button></div>
+            <div class="slider-label"><span><b>${name}</b>: <span class="val" id="db-${name}">75%</span></span><button class="btn-reset-full" onclick="resetTrackVol('${name}')">RESET</button></div>
             <div class="v-controls">
-                <input type="range" id="vol-${v}" min="0" max="100" value="75" oninput="setVol('${v}', this.value)">
-                <button class="btn-v" id="solo-${v}" onclick="toggleSolo('${v}')">SOLO</button>
-                <button class="btn-v" id="mute-${v}" onclick="toggleMute('${v}')">MUTE</button>
+                <input type="range" id="vol-${name}" min="0" max="100" value="75" oninput="setVol('${name}', this.value)">
+                <button class="btn-v" id="solo-${name}" onclick="toggleSolo('${name}')">SOLO</button>
+                <button class="btn-v" id="mute-${name}" onclick="toggleMute('${name}')">MUTE</button>
             </div>`;
-        document.getElementById('mixer-ui').appendChild(mix);
-    });
+        mixer.appendChild(mix);
+    }
+
+    function removeTrack(name) {
+        if (!confirm(`Czy na pewno usunąć ścieżkę ${name}?`)) return;
+        if (players[name]) { players[name].dispose(); delete players[name]; }
+        if (buffers[name]) delete buffers[name];
+        
+        document.getElementById(`card-${name}`).remove();
+        document.getElementById(`mixer-card-${name}`).remove();
+        trackList = trackList.filter(t => t !== name);
+        updateDuration();
+        checkButtons();
+    }
+
+    async function handleFile(input, name) {
+        if(!input.files[0]) return;
+        try {
+            if (Tone.context.state !== 'running') await Tone.start();
+            const audioBuffer = await Tone.context.decodeAudioData(await input.files[0].arrayBuffer());
+            buffers[name] = new Tone.ToneAudioBuffer(audioBuffer);
+            document.getElementById(`card-${name}`).classList.add('loaded');
+            document.getElementById(`mixer-card-${name}`).style.display = "block";
+            checkButtons();
+            updateDuration();
+        } catch (e) { alert("Błąd pliku."); }
+    }
+
+    function checkButtons() {
+        const hasFiles = Object.keys(buffers).length > 0;
+        document.getElementById('playBtn').disabled = !hasFiles;
+        document.getElementById('recBtn').disabled = !hasFiles;
+    }
 
     function seek(val) {
         const time = parseFloat(val);
@@ -160,33 +213,11 @@
         trackList.forEach(v => { if(buffers[v]) { resetTrackVol(v); if(players[v]) { players[v].mute = false; document.getElementById(`mute-${v}`).classList.remove('active-mute'); document.getElementById(`solo-${v}`).classList.remove('active-solo'); } } });
     }
 
-    async function handleFile(input, name) {
-        if(!input.files[0]) return;
-        try {
-            if (Tone.context.state !== 'running') await Tone.start();
-            const audioBuffer = await Tone.context.decodeAudioData(await input.files[0].arrayBuffer());
-            buffers[name] = new Tone.ToneAudioBuffer(audioBuffer);
-            document.getElementById(`card-${name}`).classList.add('loaded');
-            document.getElementById(`mixer-card-${name}`).style.display = "block";
-            document.getElementById('playBtn').disabled = false;
-            document.getElementById('recBtn').disabled = false;
-            updateDuration();
-        } catch (e) { alert("Błąd pliku."); }
-    }
-
-    function resetTrack(name) {
-        if(players[name]) { players[name].dispose(); delete players[name]; }
-        if(buffers[name]) delete buffers[name];
-        document.getElementById(`card-${name}`).classList.remove('loaded');
-        document.getElementById(`mixer-card-${name}`).style.display = "none";
-        updateDuration();
-    }
-
     function updateDuration() {
         totalDuration = 0;
         Object.values(buffers).forEach(b => { if(b.duration > totalDuration) totalDuration = b.duration; });
         document.getElementById('seekbar').max = totalDuration;
-        updateTimerDisplay(0);
+        updateTimerDisplay(Tone.Transport.seconds);
     }
 
     async function togglePlay() {
@@ -194,7 +225,6 @@
         if (Tone.context.state !== 'running') await Tone.start();
         
         if (Tone.Transport.state === "started") {
-            // ELIMINACJA SKOKU (FADE OUT)
             Tone.Destination.volume.rampTo(-100, 0.05);
             setTimeout(() => {
                 Tone.Transport.pause();
@@ -204,7 +234,6 @@
                 Tone.Destination.volume.value = pctToDb(document.getElementById('masterVol').value);
             }, 60);
         } else {
-            // PŁYNNE WEJŚCIE (FADE IN)
             const startTime = Tone.Transport.seconds;
             const targetVol = pctToDb(document.getElementById('masterVol').value);
             Tone.Destination.volume.value = -100;
@@ -264,7 +293,7 @@
         const tempo = parseFloat(document.getElementById('sRange').value);
         const renderLen = (totalDuration / tempo) + 0.3;
         try {
-            btnText.innerText = "RENDEROWANIE... 5%";
+            btnText.innerText = "PRZYGOTOWANIE...";
             progress.style.width = "5%";
             const buffer = await Tone.Offline(() => {
                 const master = new Tone.Volume(pctToDb(document.getElementById('masterVol').value)).toDestination();
@@ -291,7 +320,7 @@
             }
             const final = mp3encoder.flush(); if (final.length > 0) mp3Data.push(final);
             const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(mp3Data, { type: 'audio/mp3' })); a.download = `${fileName}.mp3`; a.click();
-            btnText.innerText = "GOTOWE! 100%"; progress.style.width = "100%";
+            btnText.innerText = "GOTOWE!"; progress.style.width = "100%";
         } catch (e) { alert("Błąd zapisu."); }
         finally { setTimeout(() => { btn.disabled = false; progress.style.width = "0%"; btnText.innerText = "ZAPISZ MIX (MP3)"; }, 3000); }
     }

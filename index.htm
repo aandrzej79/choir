@@ -3,19 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chór Mixer Pro - Ultra Stable</title>
+    <title>Chór Mixer Pro - Final Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.all.min.js"></script>
     <style>
         :root {
             --bg: #0b0e11; --panel: #1a1f24; --text: #e0e6ed;
-            --green: #2ecc71; --red: #e74c3c; --blue: #3498db; --accent: #f1c40f;
+            --green: #2ecc71; --red: #e74c3c; --blue: #3498db; --accent: #f1c40f; --orange: #e67e22;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 600px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .status-badge { font-size: 0.7rem; padding: 4px 10px; border-radius: 20px; background: #2c343a; color: var(--accent); border: 1px solid #3a444d; }
         
         .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .file-card {
@@ -26,12 +24,8 @@
         .file-card.loaded { border-color: var(--green); background: rgba(46, 204, 113, 0.1); }
         .file-card input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
         
-        .reset-btn {
-            position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
-            background: var(--red); color: white; border-radius: 50%; border: none;
-            font-size: 10px; cursor: pointer; display: none; z-index: 10;
-        }
-        .file-card.loaded .reset-btn { display: block; }
+        .reset-btn-track { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; background: var(--red); color: white; border-radius: 50%; border: none; font-size: 10px; cursor: pointer; display: none; z-index: 10; }
+        .file-card.loaded .reset-btn-track { display: block; }
 
         .master-panel {
             background: #242b32; padding: 20px; border-radius: 20px; margin-bottom: 20px;
@@ -39,20 +33,35 @@
         }
         .main-btns { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px; }
         button { border: none; border-radius: 10px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        
         .btn-play { background: var(--green); padding: 16px; font-size: 0.9rem; }
-        .btn-play:disabled { background: #333; color: #666; }
+        .btn-play.playing { background: var(--orange); }
         .btn-stop { background: var(--red); }
-        .btn-rec { background: var(--blue); padding: 14px; width: 100%; font-size: 0.85rem; margin-top: 5px; position: relative; overflow: hidden; }
-        .progress-bar { position: absolute; left: 0; top: 0; height: 100%; background: rgba(255,255,255,0.2); width: 0%; z-index: 1; }
+        .btn-rec { background: var(--blue); padding: 14px; width: 100%; font-size: 0.85rem; margin-top: 5px; position: relative; overflow: hidden; height: 50px; }
+        .progress-bar { position: absolute; left: 0; top: 0; height: 100%; background: rgba(0,0,0,0.3); width: 0%; z-index: 1; }
 
-        .slider-label { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 5px; color: #aaa; }
-        .val { color: var(--accent); font-weight: bold; }
-        input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; background: #3a444d; border-radius: 10px; outline: none; margin: 10px 0; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; background: #fff; border-radius: 50%; border: 2px solid var(--blue); }
+        .slider-label { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 5px; color: #aaa; align-items: center; }
+        .val { color: var(--accent); font-weight: bold; margin: 0 5px; }
+        
+        .btn-reset-full { 
+            background: #4a1c1c; color: #ff8a8a; padding: 4px 10px; 
+            font-size: 0.6rem; border-radius: 6px; border: 1px solid #632626;
+            text-transform: uppercase;
+        }
+        .btn-reset-main {
+            width: 100%; background: #2c343a; color: var(--accent); padding: 8px; 
+            font-size: 0.7rem; margin-bottom: 15px; border: 1px solid #3a444d; border-radius: 10px;
+        }
+
+        #seekbar { cursor: pointer; height: 10px; background: #111; }
+        #seekbar::-webkit-slider-thumb { background: var(--accent); border: 2px solid #fff; width: 18px; height: 18px; }
+
+        input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; background: #3a444d; border-radius: 10px; outline: none; margin: 8px 0; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: #fff; border-radius: 50%; border: 2px solid var(--blue); }
 
         .voice-card { background: var(--panel); padding: 12px; border-radius: 12px; border-left: 4px solid var(--accent); display: none; margin-bottom: 8px; }
         .v-controls { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
-        .btn-v { padding: 10px; font-size: 0.7rem; background: #2c343a; min-width: 60px; }
+        .btn-v { padding: 8px; font-size: 0.7rem; background: #2c343a; min-width: 55px; }
         .active-solo { background: var(--blue) !important; }
         .active-mute { background: var(--red) !important; }
     </style>
@@ -60,35 +69,42 @@
 <body>
 
 <div class="container">
-    <div class="header">
-        <div class="status-badge" id="status">Gotowy do pracy</div>
-    </div>
-
     <div class="upload-grid" id="uploadGrid"></div>
 
     <div class="master-panel">
+        <button class="btn-reset-main" onclick="resetAll()">RESETUJ WSZYSTKO (DOMYŚLNE)</button>
+        
         <div class="main-btns">
-            <button id="playBtn" class="btn-play" disabled onclick="togglePlay()">ZAŁADUJ I ODTWÓRZ <span id="btnTimer" style="display:block; font-size:0.7rem; opacity:0.8">0:00 / 0:00</span></button>
+            <button id="playBtn" class="btn-play" disabled onclick="togglePlay()">GRAJ ><span id="btnTimer" style="display:block; font-size:0.65rem; opacity:0.8">0:00 / 0:00</span></button>
             <button class="btn-stop" onclick="stopAudio()">STOP</button>
         </div>
+        
         <button id="recBtn" class="btn-rec" disabled onclick="mixOffline()">
             <div class="progress-bar" id="renderProgress"></div>
             <span id="recBtnText" style="position:relative; z-index:2">ZAPISZ MIX (MP3)</span>
         </button>
 
-        <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 10px;">
-            <label class="slider-label">MASTER VOLUME: <b id="mVal" class="val">75%</b></label>
+        <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 12px;">
+            <div class="slider-label">
+                <span>MASTER VOLUME: <b class="val" id="mVal">75%</b></span>
+                <button class="btn-reset-full" onclick="resetParam('masterVol', 75)">RESET</button>
+            </div>
             <input type="range" id="masterVol" min="0" max="100" value="75" oninput="setMasterVol(this.value)">
-        </div>
+            
+            <input type="range" id="seekbar" value="0" step="0.01" min="0" oninput="seek(this.value)" onmousedown="isSeeking=true" onmouseup="isSeeking=false" ontouchstart="isSeeking=true" ontouchend="isSeeking=false" style="margin: 15px 0 10px 0;">
 
-        <input type="range" id="seekbar" value="0" step="0.1" style="margin-top:10px">
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top:5px;">
-            <div><label class="slider-label">TEMPO: <b id="sVal" class="val">1.0</b>x</label><input type="range" id="sRange" min="0.5" max="1.5" step="0.05" value="1" oninput="updateTempo(this.value)"></div>
-            <div><label class="slider-label">STRÓJ: <b id="pVal" class="val">0</b>c</label><input type="range" id="pRange" min="-200" max="200" step="10" value="0" oninput="updatePitch(this.value)"></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <div class="slider-label"><span>TEMPO: <b class="val" id="sVal">1.00</b>x</span><button class="btn-reset-full" onclick="resetParam('sRange', 1)">RESET</button></div>
+                    <input type="range" id="sRange" min="0.5" max="1.5" step="0.05" value="1" oninput="updateTempo(this.value)">
+                </div>
+                <div>
+                    <div class="slider-label"><span>STRÓJ: <b class="val" id="pVal">0</b>c</span><button class="btn-reset-full" onclick="resetParam('pRange', 0)">RESET</button></div>
+                    <input type="range" id="pRange" min="-200" max="200" step="10" value="0" oninput="updatePitch(this.value)">
+                </div>
+            </div>
         </div>
     </div>
-
     <div id="mixer-ui"></div>
 </div>
 
@@ -96,24 +112,24 @@
     const trackList = ["Sopran", "Alt", "Tenor", "Bas"];
     const players = {}, buffers = {};
     let totalDuration = 0;
+    let isSeeking = false;
 
     function pctToDb(pct) { return pct == 0 ? -100 : 20 * Math.log10(pct / 100); }
     function formatTime(s) { if(!s || isNaN(s)) return "0:00"; const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}`; }
     
     Tone.Destination.volume.value = pctToDb(75);
 
-    // Budowa interfejsu
     trackList.forEach(v => {
         const grid = document.getElementById('uploadGrid');
         const card = document.createElement('div');
         card.className = 'file-card'; card.id = `card-${v}`;
-        card.innerHTML = `<button class="reset-btn" onclick="resetTrack('${v}')">✕</button><span>${v}</span><input type="file" accept="audio/*" onchange="handleFile(this, '${v}')">`;
+        card.innerHTML = `<button class="reset-btn-track" onclick="resetTrack('${v}')">✕</button><span>${v}</span><input type="file" accept="audio/*" onchange="handleFile(this, '${v}')">`;
         grid.appendChild(card);
 
         const mix = document.createElement('div');
         mix.className = 'voice-card'; mix.id = `mixer-card-${v}`;
         mix.innerHTML = `
-            <div class="slider-label"><b>${v}</b> <span id="db-${v}">75%</span></div>
+            <div class="slider-label"><span><b>${v}</b>: <span class="val" id="db-${v}">75%</span></span><button class="btn-reset-full" onclick="resetTrackVol('${v}')">RESET</button></div>
             <div class="v-controls">
                 <input type="range" id="vol-${v}" min="0" max="100" value="75" oninput="setVol('${v}', this.value)">
                 <button class="btn-v" id="solo-${v}" onclick="toggleSolo('${v}')">SOLO</button>
@@ -122,34 +138,40 @@
         document.getElementById('mixer-ui').appendChild(mix);
     });
 
-    // PANCERNE ŁADOWANIE
+    function seek(val) {
+        const time = parseFloat(val);
+        Tone.Transport.seconds = time;
+        if (Tone.Transport.state === "started") {
+            trackList.forEach(v => { if (players[v]) { players[v].stop(); players[v].start(0, time); } });
+        }
+        updateTimerDisplay(time);
+    }
+
+    function updateTimerDisplay(time) {
+        const timer = document.getElementById('btnTimer');
+        if(timer) timer.innerText = `${formatTime(time)} / ${formatTime(totalDuration)}`;
+    }
+
+    function resetParam(id, val) { const el = document.getElementById(id); el.value = val; el.dispatchEvent(new Event('input')); }
+    function resetTrackVol(v) { resetParam(`vol-${v}`, 75); }
+
+    function resetAll() {
+        resetParam('masterVol', 75); resetParam('sRange', 1); resetParam('pRange', 0);
+        trackList.forEach(v => { if(buffers[v]) { resetTrackVol(v); if(players[v]) { players[v].mute = false; document.getElementById(`mute-${v}`).classList.remove('active-mute'); document.getElementById(`solo-${v}`).classList.remove('active-solo'); } } });
+    }
+
     async function handleFile(input, name) {
         if(!input.files[0]) return;
-        const status = document.getElementById('status');
-        status.innerText = `Analiza: ${name}...`;
-        
         try {
             if (Tone.context.state !== 'running') await Tone.start();
-            
-            // Pobieramy plik jako binarne dane
-            const arrayBuffer = await input.files[0].arrayBuffer();
-            
-            // Używamy natywnego dekodera przeglądarki (najsilniejszy)
-            const audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
-            
+            const audioBuffer = await Tone.context.decodeAudioData(await input.files[0].arrayBuffer());
             buffers[name] = new Tone.ToneAudioBuffer(audioBuffer);
             document.getElementById(`card-${name}`).classList.add('loaded');
             document.getElementById(`mixer-card-${name}`).style.display = "block";
             document.getElementById('playBtn').disabled = false;
             document.getElementById('recBtn').disabled = false;
-            
             updateDuration();
-            status.innerText = "System gotowy";
-        } catch (e) {
-            console.error(e);
-            status.innerText = "BŁĄD DEKODOWANIA";
-            alert("Plik MP3 jest uszkodzony lub ma niestandardowy format. Spróbuj go zapisać ponownie w dowolnym edytorze.");
-        }
+        } catch (e) { alert("Błąd pliku."); }
     }
 
     function resetTrack(name) {
@@ -164,16 +186,29 @@
         totalDuration = 0;
         Object.values(buffers).forEach(b => { if(b.duration > totalDuration) totalDuration = b.duration; });
         document.getElementById('seekbar').max = totalDuration;
-        document.getElementById('btnTimer').innerText = `0:00 / ${formatTime(totalDuration)}`;
+        updateTimerDisplay(0);
     }
 
     async function togglePlay() {
+        const btn = document.getElementById('playBtn');
         if (Tone.context.state !== 'running') await Tone.start();
         
         if (Tone.Transport.state === "started") {
-            Tone.Transport.pause();
-            trackList.forEach(v => { if(players[v]) players[v].stop(); });
+            // ELIMINACJA SKOKU (FADE OUT)
+            Tone.Destination.volume.rampTo(-100, 0.05);
+            setTimeout(() => {
+                Tone.Transport.pause();
+                trackList.forEach(v => { if(players[v]) players[v].stop(); });
+                btn.classList.remove('playing');
+                btn.innerHTML = `WZNÓW > <span id="btnTimer" style="display:block; font-size:0.65rem; opacity:0.8">${formatTime(Tone.Transport.seconds)} / ${formatTime(totalDuration)}</span>`;
+                Tone.Destination.volume.value = pctToDb(document.getElementById('masterVol').value);
+            }, 60);
         } else {
+            // PŁYNNE WEJŚCIE (FADE IN)
+            const startTime = Tone.Transport.seconds;
+            const targetVol = pctToDb(document.getElementById('masterVol').value);
+            Tone.Destination.volume.value = -100;
+            
             trackList.forEach(v => {
                 if (buffers[v]) {
                     if(players[v]) players[v].dispose();
@@ -181,17 +216,25 @@
                     setVol(v, document.getElementById(`vol-${v}`).value);
                     players[v].playbackRate = parseFloat(document.getElementById('sRange').value);
                     players[v].detune = parseInt(document.getElementById('pRange').value);
-                    players[v].start(0, Tone.Transport.seconds);
+                    players[v].start(0, startTime);
                 }
             });
             Tone.Transport.start();
+            Tone.Destination.volume.rampTo(targetVol, 0.05);
+            btn.classList.add('playing');
+            btn.innerHTML = `PAUZA || <span id="btnTimer" style="display:block; font-size:0.65rem; opacity:0.8">${formatTime(startTime)} / ${formatTime(totalDuration)}</span>`;
         }
     }
 
     function stopAudio() {
+        Tone.Destination.volume.cancelScheduledValues(Tone.now());
         Tone.Transport.stop(); Tone.Transport.seconds = 0;
         trackList.forEach(v => { if(players[v]) players[v].stop(); });
         document.getElementById('seekbar').value = 0;
+        Tone.Destination.volume.value = pctToDb(document.getElementById('masterVol').value);
+        const btn = document.getElementById('playBtn');
+        btn.classList.remove('playing');
+        btn.innerHTML = `GRAJ > <span id="btnTimer" style="display:block; font-size:0.65rem; opacity:0.8">0:00 / ${formatTime(totalDuration)}</span>`;
     }
 
     function setVol(v, val) { if(players[v]) players[v].volume.value = pctToDb(val); document.getElementById(`db-${v}`).innerText = val + "%"; }
@@ -212,69 +255,54 @@
     }
 
     async function mixOffline() {
+        let fileName = window.prompt("Nazwa mixu:", "Chor_Nagranie");
+        if (!fileName) return;
         const btn = document.getElementById('recBtn');
+        const btnText = document.getElementById('recBtnText');
         const progress = document.getElementById('renderProgress');
         stopAudio(); btn.disabled = true;
         const tempo = parseFloat(document.getElementById('sRange').value);
         const renderLen = (totalDuration / tempo) + 0.3;
-
         try {
-            document.getElementById('recBtnText').innerText = "MIKSOWANIE...";
-            progress.style.width = "40%";
-            
+            btnText.innerText = "RENDEROWANIE... 5%";
+            progress.style.width = "5%";
             const buffer = await Tone.Offline(() => {
                 const master = new Tone.Volume(pctToDb(document.getElementById('masterVol').value)).toDestination();
                 trackList.forEach(v => {
                     if (buffers[v]) {
                         const p = new Tone.GrainPlayer(buffers[v]).connect(master);
                         p.volume.value = pctToDb(document.getElementById(`vol-${v}`).value);
-                        p.playbackRate = tempo;
-                        p.detune = parseInt(document.getElementById('pRange').value);
+                        p.playbackRate = tempo; p.detune = parseInt(document.getElementById('pRange').value);
                         p.mute = document.getElementById(`mute-${v}`).classList.contains('active-mute');
                         p.start(0);
                     }
                 });
             }, renderLen);
-
-            progress.style.width = "80%";
-            document.getElementById('recBtnText').innerText = "EXPORT DO MP3...";
-            
             const mp3encoder = new lamejs.Mp3Encoder(buffer.numberOfChannels, buffer.sampleRate, 128);
-            const mp3Data = [];
-            const left = buffer.getChannelData(0);
-            const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left;
-
-            const left16 = new Int16Array(left.length);
-            const right16 = new Int16Array(right.length);
-            for(let i=0; i<left.length; i++) { 
-                left16[i] = Math.max(-32768, Math.min(32767, left[i] * 32768)); 
-                right16[i] = Math.max(-32768, Math.min(32767, right[i] * 32768)); 
-            }
-
-            for (let i = 0; i < left16.length; i += 1152) {
-                const mp3buf = mp3encoder.encodeBuffer(left16.subarray(i, i + 1152), right16.subarray(i, i + 1152));
+            const mp3Data = []; const left = buffer.getChannelData(0); const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left;
+            const left16 = new Int16Array(left.length); const right16 = new Int16Array(right.length);
+            for(let i=0; i<left.length; i++) { left16[i] = Math.max(-32768, Math.min(32767, left[i] * 32768)); right16[i] = Math.max(-32768, Math.min(32767, right[i] * 32768)); }
+            const blockSize = 1152; const total = left16.length;
+            for (let i = 0; i < total; i += blockSize) {
+                const mp3buf = mp3encoder.encodeBuffer(left16.subarray(i, i + blockSize), right16.subarray(i, i + blockSize));
                 if (mp3buf.length > 0) mp3Data.push(mp3buf);
+                let p = Math.floor(20 + (i / total) * 75);
+                btnText.innerText = `ZAPISYWANIE... ${p}%`; progress.style.width = `${p}%`;
             }
-            const final = mp3encoder.flush();
-            if (final.length > 0) mp3Data.push(final);
-
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(new Blob(mp3Data, { type: 'audio/mp3' }));
-            a.download = "ChorMix_Final.mp3"; a.click();
-            
-            progress.style.width = "100%";
-            document.getElementById('recBtnText').innerText = "POBRANO!";
-        } catch (e) { alert("Błąd eksportu."); }
-        finally {
-            setTimeout(() => { btn.disabled = false; progress.style.width = "0%"; document.getElementById('recBtnText').innerText = "ZAPISZ MIX (MP3)"; }, 2000);
-        }
+            const final = mp3encoder.flush(); if (final.length > 0) mp3Data.push(final);
+            const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(mp3Data, { type: 'audio/mp3' })); a.download = `${fileName}.mp3`; a.click();
+            btnText.innerText = "GOTOWE! 100%"; progress.style.width = "100%";
+        } catch (e) { alert("Błąd zapisu."); }
+        finally { setTimeout(() => { btn.disabled = false; progress.style.width = "0%"; btnText.innerText = "ZAPISZ MIX (MP3)"; }, 3000); }
     }
 
     Tone.Transport.scheduleRepeat(() => {
-        const now = Tone.Transport.seconds;
-        document.getElementById('seekbar').value = now;
-        document.getElementById('btnTimer').innerText = `${formatTime(now)} / ${formatTime(totalDuration)}`;
-        if (totalDuration > 0 && now >= totalDuration) stopAudio();
+        if (!isSeeking) {
+            const now = Tone.Transport.seconds;
+            document.getElementById('seekbar').value = now;
+            updateTimerDisplay(now);
+        }
+        if (totalDuration > 0 && Tone.Transport.seconds >= totalDuration) stopAudio();
     }, "0.1s");
 </script>
 </body>
